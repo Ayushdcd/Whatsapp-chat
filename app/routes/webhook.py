@@ -4,11 +4,12 @@ from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import PlainTextResponse
 
 from app.services.groq_service import generate_ai_reply
-from app.services.logging_service import webhook_logger
+from app.services.logging_service import WEBHOOK_LOG_FILE, webhook_logger
 from app.services.whatsapp_service import send_whatsapp_text
 
 router = APIRouter()
 VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "Ayush_AI_Chat")
+WEBHOOK_LOG_TOKEN = os.getenv("WEBHOOK_LOG_TOKEN")
 
 
 @router.get("/webhook")
@@ -79,3 +80,18 @@ async def receive_message(request: Request):
     webhook_logger.info("Reply generated for=%s sent=%s", mobile, sent)
 
     return {"status": "sent" if sent else "failed"}
+
+
+@router.get("/admin/webhook-log")
+async def view_webhook_log(request: Request):
+    token = request.query_params.get("token")
+    if not WEBHOOK_LOG_TOKEN or token != WEBHOOK_LOG_TOKEN:
+        webhook_logger.warning("Webhook log access denied.")
+        return Response(status_code=status.HTTP_403_FORBIDDEN)
+
+    try:
+        content = WEBHOOK_LOG_FILE.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        content = ""
+
+    return PlainTextResponse(content=content)
