@@ -12,6 +12,18 @@ VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "Ayush_AI_Chat")
 WEBHOOK_LOG_TOKEN = os.getenv("WEBHOOK_LOG_TOKEN")
 
 
+def _extract_message_data(data: dict):
+    try:
+        return data["entry"][0]["changes"][0]["value"]["messages"][0], "whatsapp"
+    except (KeyError, IndexError, TypeError):
+        pass
+
+    try:
+        return data["messages"][0], "test"
+    except (KeyError, IndexError, TypeError):
+        return None, None
+
+
 @router.get("/webhook")
 async def verify_webhook(request: Request):
     mode = request.query_params.get("hub.mode")
@@ -41,17 +53,19 @@ async def receive_message(request: Request):
 
     webhook_logger.info("Webhook POST received.")
 
-    try:
-        value = data["entry"][0]["changes"][0]["value"]
-        message_data = value["messages"][0]
-    except (KeyError, IndexError) as exc:
-        webhook_logger.info("Webhook ignored: no message payload. error=%s", exc)
+    message_data, payload_format = _extract_message_data(data)
+    if not message_data:
+        webhook_logger.info(
+            "Webhook ignored: no message payload. top_level_keys=%s",
+            list(data.keys()) if isinstance(data, dict) else type(data).__name__,
+        )
         return {"status": "ignored"}
 
-    if message_data.get("type") != "text":
+    message_type = message_data.get("type", "text" if "text" in message_data else None)
+    if message_type != "text":
         webhook_logger.info(
             "Webhook ignored: unsupported message type=%s",
-            message_data.get("type"),
+            message_type,
         )
         return {"status": "ignored"}
 
@@ -67,7 +81,12 @@ async def receive_message(request: Request):
         return {"status": "ignored"}
 
     print(f"User ({mobile}): {message}")
-    webhook_logger.info("Incoming message from=%s text=%s", mobile, message)
+    webhook_logger.info(
+        "Incoming message format=%s from=%s text=%s",
+        payload_format,
+        mobile,
+        message,
+    )
 
     try:
         reply = generate_ai_reply(message)
@@ -78,8 +97,10 @@ async def receive_message(request: Request):
 
     print(f"Bot: {reply}")
     webhook_logger.info("Reply generated for=%s sent=%s", mobile, sent)
+    if not sent:
+        return {"status": "failed", "reason": "whatsapp_send_failed"}
 
-    return {"status": "sent" if sent else "failed"}
+    return {"status": "sent"}
 
 
 @router.get("/admin/webhook-log")
