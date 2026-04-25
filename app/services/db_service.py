@@ -176,6 +176,21 @@ def init_db():
                 )
                 cursor.execute(
                     """
+                    DELETE FROM users a
+                    USING users b
+                    WHERE a.id < b.id
+                      AND a.external_id = b.external_id
+                      AND a.source = b.source
+                    """
+                )
+                cursor.execute(
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_users_external_source
+                    ON users (external_id, source)
+                    """
+                )
+                cursor.execute(
+                    """
                     CREATE INDEX IF NOT EXISTS idx_messages_user_created
                     ON messages (user_id, created_at DESC)
                     """
