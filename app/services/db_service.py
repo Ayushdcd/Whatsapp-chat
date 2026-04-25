@@ -403,7 +403,11 @@ def get_recent_messages(*, user_id: Optional[int], limit: int = 6) -> list[dict]
                 )
                 rows = cursor.fetchall()
         return [
-            {"role": row[0], "content": row[1], "created_at": row[2].isoformat()}
+            {
+                "role": row[0],
+                "content": row[1],
+                "created_at": row[2].isoformat() if row[2] is not None else None,
+            }
             for row in reversed(rows)
         ]
     except Exception:
