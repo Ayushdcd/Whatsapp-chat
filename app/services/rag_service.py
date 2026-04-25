@@ -26,6 +26,14 @@ GENERAL_INVENTORY_TERMS = {
 }
 
 
+def _env_flag(name: str, default: str = "false") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _vector_search_enabled() -> bool:
+    return _env_flag("ENABLE_VECTOR_SEARCH", "false")
+
+
 def _inventory_text(item: dict) -> str:
     parts = [
         item.get("name") or "",
@@ -101,6 +109,14 @@ def _format_inventory_items(items: list[dict]) -> str:
 
 @lru_cache(maxsize=1)
 def _load_embedding_components():
+    if not _vector_search_enabled():
+        return {
+            "faiss": None,
+            "np": None,
+            "model": None,
+            "available": False,
+            "error": "vector_search_disabled",
+        }
     try:
         import faiss
         import numpy as np
@@ -165,6 +181,9 @@ def _build_vector_index(signature: tuple):
 
 
 def _search_inventory_vector(query: str, limit: int = 5) -> list[dict]:
+    if not _vector_search_enabled():
+        return []
+
     inventory_items = fetch_inventory_for_vector_index()
     signature = _vector_signature(inventory_items)
     if not signature:
