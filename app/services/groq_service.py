@@ -1,4 +1,5 @@
 import os
+
 import requests
 
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
@@ -17,11 +18,17 @@ def generate_ai_reply(user_message: str, context: str = ""):
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful sales assistant. Be short and conversational."
+                "content": (
+                    "You are a helpful sales assistant. Be short and conversational. "
+                    "Use the provided structured product context as the source of truth. "
+                    "Only mention product names, prices, stock, features, and availability if they appear in the provided context. "
+                    "Do not invent product specs, prices, discounts, delivery promises, or availability. "
+                    "If no matching products are present, say that clearly and ask one brief follow-up question."
+                )
             },
             {
                 "role": "user",
-                "content": context + "\nUser: " + user_message
+                "content": f"{context}\n\nUser question: {user_message}"
             }
         ]
     }
@@ -48,4 +55,4 @@ def generate_ai_reply(user_message: str, context: str = ""):
         return "Sorry, something went wrong."
 
     data = response.json()
-    return data['choices'][0]['message']['content']
+    return data["choices"][0]["message"]["content"]
